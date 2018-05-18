@@ -3,6 +3,7 @@
 
 # In[39]:
 ####hola!!!!
+#Hola senora!
 
 # If memory/processing speed becomes an issue, may need to launch Jupyter from terminal with 
 # "jupyter notebook --NotebookApp.iopub_data_rate_limit=10000000000"
