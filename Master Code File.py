@@ -371,6 +371,34 @@ for max_vector_log in max_vector_logs:
 # http://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/modules/generated/sklearn.mixture.GMM.html
 
 
+# In[NEW]
+
+### K-MEANS CLUSTERING FOR 2-DIMENSIONAL DATA ###
+
+# NOTE: We can definitely streamline this function so that it is less laborious to prepare the data to be entered and passed through it.
+# I am going to work on that today.
+
+def kmeans_cluster(input_data, clusters):
+    reshaped_input = input_data
+    reshaped_input.shape = (reshaped_input.shape[0],1)
+    kmeans = KMeans(n_clusters = clusters)
+    kmeans.fit(reshaped_input)
+    
+    centroids = kmeans.cluster_centers_
+    labels = kmeans.labels_
+    
+    colors = ["g.", "r."]
+    
+    for i in range(len(reshaped_input)):
+        #print("coordinate:", reshaped_input[i])
+        plt.plot(reshaped_input[i][0], colors[labels[i]])
+        sns.despine()
+
+# An example of the input might be (tuples?) of sum_sq_diff values and Pearson's correlation coefficient values for each frame,
+# or any other statistics that we might try that could be collected on a frame-by-frame basis.
+kmeans_cluster(INPUT_GOES_HERE[1], 2)
+
+
 # In[393]:
 
 
