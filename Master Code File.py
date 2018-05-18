@@ -69,11 +69,13 @@ video_files = [VideoFileClip("motion_test.mov"), VideoFileClip("test_vid_2.mov")
 
 
 sum_sq_diff_list = []
+pearson_list = []
 
 # Loop over each video to be scored:
 for video in video_files:
     sum_sq_diff = []
     prev_frame = []
+    pearson = []
     total_frames = 0
     
     # Within each video, loop over individual frames, comparing each frame to its preceding frame:
@@ -83,18 +85,30 @@ for video in video_files:
             total_frames += 1
             
             # Get the delta between contiguous frames:
-            diff_frame = this_frame-prev_frame
+            diff_frame = this_frame - prev_frame
             
+            ### SUM OF SQUARED DIFFERENCES BETWEEN FRAMES ###
             # Square each delta to eliminate negative values:
             diff_frame_sq = np.power(diff_frame, 2)
             sum_diff_frame_sq = np.sum( diff_frame_sq )
             sum_sq_diff.append( sum_diff_frame_sq )
             
+            ### PEARSON'S CORRELATION COEFFICIENT BETWEEN FRAMES ###
+            # Get the r-squared (Pearson's) correlation coefficient between each frame:
+            # ::: Do some math to this_frame & prev_frame to get this value; store that value a float variable :::
+            # ::: Append the individual Pearson value to the "pearson = []" list :::
+            # pearson.append(your_output_variable_here)
+            
         prev_frame = this_frame
         
-    # Append the full list of squared deltas to a master list of 
+    # Append the full list of squared deltas from each video to a master list of 
     # squared deltas for each of the n videos to be scored:
     sum_sq_diff_list.append(sum_sq_diff)
+    
+    # Append the full list of Pearson's values from each video to a master list of 
+    # Pearson's correlation coefficients for each of the n videos to be scored:
+    pearson_list.append(pearson)
+
     print total_frames
     
     # Plot some contiguous frames and delta frames from each video:
