@@ -1,9 +1,8 @@
 
 # coding: utf-8
 
-# In[39]:
-####hola!!!!
-#Hola senora!
+# In[33]:
+
 
 # If memory/processing speed becomes an issue, may need to launch Jupyter from terminal with 
 # "jupyter notebook --NotebookApp.iopub_data_rate_limit=10000000000"
@@ -20,10 +19,11 @@ import seaborn as sns
 
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from scipy import ndimage, misc, stats
+from scipy.misc import imsave
 from scipy.ndimage.filters import minimum_filter
 from matplotlib.font_manager import FontProperties
 from sklearn.mixture import GMM
-#from sklearn.cluster import KMeans # Probably won't need this one, which is for k-means clustering in 2-d space
+from sklearn.cluster import KMeans
 
 # http://zulko.github.io/moviepy/
 from moviepy.editor import *
@@ -32,7 +32,7 @@ get_ipython().magic(u'matplotlib inline')
 imageio.plugins.ffmpeg.download()
 
 
-# In[3]:
+# In[2]:
 
 
 ### Style ###
@@ -44,7 +44,7 @@ size = (6, 3.5)
 header_space = 0.88 
 
 
-# In[4]:
+# In[3]:
 
 
 # RGB to grayscale function:
@@ -56,7 +56,7 @@ def rgb2gray(rgb):
     return gray
 
 
-# In[5]:
+# In[4]:
 
 
 # Create a list of video files to score.
@@ -65,17 +65,19 @@ def rgb2gray(rgb):
 video_files = [VideoFileClip("motion_test.mov"), VideoFileClip("test_vid_2.mov"), VideoFileClip("test_vid_4.mov"), VideoFileClip("test_vid_5.mov")]
 
 
-# In[6]:
+# In[5]:
 
 
 sum_sq_diff_list = []
-pearson_list = []
+
+r_squared_values_list = []
 
 # Loop over each video to be scored:
 for video in video_files:
     sum_sq_diff = []
+    r_squared_values = []
+    #pearson = []
     prev_frame = []
-    pearson = []
     total_frames = 0
     
     # Within each video, loop over individual frames, comparing each frame to its preceding frame:
@@ -85,30 +87,25 @@ for video in video_files:
             total_frames += 1
             
             # Get the delta between contiguous frames:
-            diff_frame = this_frame - prev_frame
+            diff_frame = this_frame-prev_frame
+            r_squared = (np.corrcoef(np.ravel(this_frame), np.ravel(prev_frame))[0,1])**2
+            r_squared_values.append(r_squared)
             
-            ### SUM OF SQUARED DIFFERENCES BETWEEN FRAMES ###
             # Square each delta to eliminate negative values:
             diff_frame_sq = np.power(diff_frame, 2)
             sum_diff_frame_sq = np.sum( diff_frame_sq )
             sum_sq_diff.append( sum_diff_frame_sq )
             
-            ### PEARSON'S CORRELATION COEFFICIENT BETWEEN FRAMES ###
-            # Get the r-squared (Pearson's) correlation coefficient between each frame:
-            # ::: Do some math to this_frame & prev_frame to get this value; store that value a float variable :::
-            # ::: Append the individual Pearson value to the "pearson = []" list :::
-            # pearson.append(your_output_variable_here)
+            # Get the r-squared (or Pearson's) correlation coefficient between each frame:
+            # ::: Do something to diff_frame to get this value; store that value a float variable :::
+            # ::: Append the value to the "pearson = []" list :::
             
         prev_frame = this_frame
         
-    # Append the full list of squared deltas from each video to a master list of 
+    # Append the full list of squared deltas to a master list of 
     # squared deltas for each of the n videos to be scored:
     sum_sq_diff_list.append(sum_sq_diff)
-    
-    # Append the full list of Pearson's values from each video to a master list of 
-    # Pearson's correlation coefficients for each of the n videos to be scored:
-    pearson_list.append(pearson)
-
+    r_squared_values_list.append(r_squared_values)
     print total_frames
     
     # Plot some contiguous frames and delta frames from each video:
@@ -116,11 +113,109 @@ for video in video_files:
     axarr[0].imshow(this_frame)
     axarr[1].imshow(prev_frame)
     axarr[2].imshow(diff_frame)
+
+
+# In[65]:
+
+
+###PLOT AND STORE RAW, NORMALIZED, AND LOG-TRANSFORMED/NORMALIZED R-SQUARED VALUES ###
+
+palette = sns.cubehelix_palette(n_colors = len(r_squared_values_list), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
+
+count = 0
+
+normalized_r2_values = []
+log_transformed_normalized_r2_values = []
+outliers_list = []
+
+# Iterate over the list of lists of r-squared values:
+for values in r_squared_values_list:
     
-#print sum_sq_diff_list
+    temp_normalized_values = []
+    temp_log_transformed_normalized_values = []
+    
+    # Iterate over each r-squared value, to get/store normalized and log-transformed/normalized values:
+    for value in values:
+        
+        # Get normalized values:
+        norm_value = (1 - value) * 100
+        temp_normalized_values.append(norm_value)
+        
+        # Get log-transformed normalized values:
+        log_transformed = np.log(norm_value) # Constant added to avoid negative values
+        if np.isfinite(log_transformed) == True:
+            temp_log_transformed_normalized_values.append(log_transformed)
+        else:
+            temp_log_transformed_normalized_values.append(0)
+    
+    # We are getting a few extreme outliers in the temp_log_transformed_normalized_values list.
+    # These outliers are skewing our graphs, so we have done some manipulations to eliminate them 
+    # using relative absolute distance from the median. This way, the filter will work for any inputs:
+    
+    log_median = np.median(temp_log_transformed_normalized_values)
+        
+    # Iterate over each value in temp_log_transformed_normalized_values and calculate/store the absolute
+    # distance from the median for each:
+    log_abs_dists = []
+    for log in temp_log_transformed_normalized_values:
+        dist = abs(log - log_median)
+        log_abs_dists.append(dist)
+        
+    log_median_abs_dist = np.median(log_abs_dists)
+            
+    # Iterate over each value in temp_log_transformed_normalized_values and check to see whether it's an outlier.
+    # If it is an outlier, change the value to zero. If not, pass.
+    outliers = []
+    count_2 = 0    
+    for i in temp_log_transformed_normalized_values:
+        sensitivity = 3 # A smaller value will capture more outliers; large values assume large "spread"
+        if abs(i) > abs(log_median) + (sensitivity * log_median_abs_dist):
+            outliers.append(i)
+            print "Outlying value {} has been replaced with 0 in Video {}'s log-transformed normalized data.".format(i, count + 1)
+            temp_log_transformed_normalized_values[count_2] = 0
+        else:
+            pass
+        count_2 += 1
+
+    outliers_list.append(outliers)
+    
+    # Plot histograms of the normalized r-squared values:
+    
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 3), sharex=False, sharey=False, subplot_kw={'adjustable': 'box-forced'})
+    fig.suptitle('R-Squared Values: Video {}'.format(count + 1), fontsize=15)
+    ax = axes.ravel()
+
+    # Unadjusted r-squared scores:
+    ax[0].set_ylabel('frames', fontsize = 15)
+    ax[0].set_xlabel('raw r-squared value', fontsize = 15)
+    ax[0].hist(values, bins=25, color = palette[count]);
+    ax[0].set_ylim(bottom=0)
+    ax[0].set_xlim(left=min(values), right=max(values))
+
+    # Normalized r-squared scores:
+    ax[1].set_xlabel('normalized r-squared value', fontsize = 15)
+    ax[1].hist(temp_normalized_values, bins=25, color = palette[count]);
+    ax[1].set_ylim(bottom=0)
+    ax[1].set_xlim(left=min(temp_normalized_values), right=max(temp_normalized_values))
+    
+    # Log-transformed r-squared scores:
+    plot_me = temp_log_transformed_normalized_values - min(temp_log_transformed_normalized_values)
+    #print np.median
+    ax[2].set_xlabel('log-transformed normalized\nr-squared value', fontsize = 15)
+    ax[2].hist(plot_me, bins=25, color = palette[count]);
+    ax[2].set_ylim(bottom=0)
+    ax[2].set_xlim(left=0, right=max(plot_me))
+    ax[2].axvline(x = np.median(plot_me), c = "r", dashes = [1, 2], label = "median:\n{:.2f}".format(np.median(plot_me)))
+    ax[2].legend(bbox_to_anchor=(1.02, 1.03), loc="upper right", borderaxespad=0., fontsize = 14, frameon=True, framealpha=1, edgecolor = "inherit", handletextpad=.5)
+    
+    # Store each list of normalized r-squared values outside the loop for later use:
+    normalized_r2_values.append(temp_normalized_values)
+    log_transformed_normalized_r2_values.append(temp_log_transformed_normalized_values)
+        
+    count += 1
 
 
-# In[7]:
+# In[ ]:
 
 
 # Several lists generated in the following for loop will need to be saved as lists of sub-lists for later use:
@@ -149,7 +244,7 @@ for sum_of_sq_differences in sum_sq_diff_list:
     # Generate plots:
     fig = plt.figure()
     fig.set_size_inches(size)
-    fig.suptitle('Frame-by-Frame Filter Scores (Video {})'.format(count + 1), fontsize = 15)
+    fig.suptitle('Frame-by-Frame Filter Scores: Video {}'.format(count + 1), fontsize = 15)
 
     ax = fig.add_subplot(111)
     fig.subplots_adjust(top=header_space)
@@ -157,9 +252,10 @@ for sum_of_sq_differences in sum_sq_diff_list:
     ax.set_xlabel('frame', fontsize = 15)
     ax.set_ylabel('filter scores', fontsize = 15)
 
-    plt.plot(my_ordered_array, min_vector, 'bx', label = "minimum filter")
-    plt.plot(my_ordered_array, max_vector, 'gx', label = "maximum filter")
-    
+    plt.plot(my_ordered_array, min_vector, 'b-', label = "minimum filter", alpha = .5, linewidth = 2)
+    plt.plot(my_ordered_array, max_vector, 'g-', label = "maximum filter", alpha = .5, linewidth = 2)
+    plt.plot(my_ordered_array, normalized_r2_values[count], 'r-', label = "r-squared values", alpha = .5, linewidth = 2)
+
     ax.legend(bbox_to_anchor=(1.25, 0.5), loc="center", borderaxespad=0., fontsize = 14, frameon=False, handletextpad=.5)
     
     # Store necessary data in their respective lists for later use:
@@ -171,12 +267,7 @@ for sum_of_sq_differences in sum_sq_diff_list:
     count += 1
 
 
-# ### Conceptual problem 1:
-# 
-# ### What is the "right" value for n in the previous cell? Are there characteristics of each video that can be recursively fed into this line to dynamically set an appropriate n, for instance relative to an animal's average speed?
-# 
-
-# In[8]:
+# In[ ]:
 
 
 freezing_list = []
@@ -194,12 +285,12 @@ for min_vector in min_vectors_list:
     # Give it a try by changing the threshold to a 
     # different value and re-examining the plots.
     freezing_threshold = 4
-    freezing[min_vector < freezing_threshold] = 1*max(min_vector)
+    freezing[min_vector < freezing_threshold] = max(min_vector)
 
     # Generate plots:
     fig = plt.figure()
     fig.set_size_inches(size)
-    fig.suptitle('Filtered Motion Score (Video {})'.format(count +1), fontsize=15)
+    fig.suptitle('Filtered Motion Score: Video {}'.format(count +1), fontsize=15)
 
     ax = fig.add_subplot(111)
     fig.subplots_adjust(top=header_space)
@@ -209,8 +300,9 @@ for min_vector in min_vectors_list:
 
     plt.plot(my_ordered_array_list[count], min_vector, 'b-', label = "minimum vector")
     plt.plot(my_ordered_array_list[count], freezing, "g-", label = '"freezing" score')
+    plt.axhline(y = np.mean(min_vectors_list[count]), c = "r", dashes = [1, 2], label = "mean minimum vector: {:.2f}".format(np.mean(min_vectors_list[count])))
 
-    ax.legend(bbox_to_anchor=(1.25, 0.5), loc="center", borderaxespad=0., fontsize = 14, frameon=False, handletextpad=.5)
+    ax.legend(bbox_to_anchor=(1.38, 0.5), loc="center", borderaxespad=0., fontsize = 14, frameon=False, handletextpad=.5)
     
     # Store freezing values for each of the n videos as a list of sub-lists, for later use:
     freezing_list.append(freezing)
@@ -220,7 +312,7 @@ for min_vector in min_vectors_list:
     count += 1
 
 
-# In[9]:
+# In[ ]:
 
 
 # Plot the maximum vector scores from each video as a histogram to visualize
@@ -232,7 +324,7 @@ count = 0
 
 for max_vector in max_vectors_list:
     fig = plt.figure()
-    fig.suptitle('Distribution of Maximum Filter Scores (Video{})'.format(count + 1), fontsize=15)
+    fig.suptitle('Distribution of Maximum Filter Scores: Video{}'.format(count + 1), fontsize=15)
 
     ax = fig.add_subplot(111)
     fig.subplots_adjust(top=header_space)
@@ -248,7 +340,7 @@ for max_vector in max_vectors_list:
     count += 1
 
 
-# In[13]:
+# In[ ]:
 
 
 ### LOG TRANSFORMED PLOTS ###
@@ -267,7 +359,7 @@ for max_vector in max_vectors_list:
 
     # Generate log-transformed plots:
     fig = plt.figure()
-    fig.suptitle('Distribution of Log-Transformed Maximum Filter Scores (Video {})'.format(count + 1), fontsize=15)
+    fig.suptitle('Distribution of Log-Transformed Maximum Filter Scores: Video {}'.format(count + 1), fontsize=15)
     fig.set_size_inches(size)
 
     ax = fig.add_subplot(111)
@@ -278,129 +370,16 @@ for max_vector in max_vectors_list:
 
     plt.hist(max_vector_log, color = palette[count])
     plt.gca().set_ylim(bottom=0)
-    plt.gca().set_xlim(left=0)
+    plt.gca().set_xlim(left=0, right=max(max_vector_log))
     
     count += 1
 
 
-# In[392]:
+# In[ ]:
 
 
-palette = sns.cubehelix_palette(n_colors = len(max_vectors_list), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
-
-count = 0
-
-# Save some values to use later:
-xpdf_list = []
-density_list = []
-clf_list = []
-
-# Set the number of Gaussians to be used in our model:
-peaks = 3
-
-# Iterate over max_vector_logs to generate histograms and composite Gaussians
-for max_vector_log in max_vector_logs:
-    
-    # Reshape the data to facilitate Gaussian modeling:
-    max_vector_log.shape = (max_vector_log.shape[0],1)
-    
-    # Set the Gaussian mixed model to fit 2 Gaussians;
-    # conduct 300 iterations to determine the best fit:
-    clf = GMM(peaks, n_iter = 300).fit(max_vector_log)
-    clf_list.append(clf)
-    
-    # Reshape the data to facilitate probability density polotting:
-    xpdf = np.linspace(-2, 7, 1000)
-    xpdf.shape = (xpdf.shape[0], 1)
-    xpdf_list.append(xpdf)
-    
-    density = np.exp(clf.score(xpdf))
-    density_list.append(density)
-
-    # Generate plots:
-    fig = plt.figure()
-
-    plt.hist(max_vector_log, 10, normed = True, color = palette[count], alpha = 1)
-    plt.plot(xpdf, density, "r-")
-    plt.xlim(-2, 7)
-    fig.set_size_inches(size)
-    
-    fig.suptitle("1-Dimensional Gaussian Mixture Model:\nFreezing and Motion Frames (Video {})".format(count + 1), fontsize=16)
-
-    fig.subplots_adjust(top=header_space - .05)
-
-    ax = plt.gca()
-
-    ax.set_xlabel("Log-Transformed Maximum Filter Score", fontsize = 15)
-    ax.set_ylabel("Probability Density", fontsize = 15)
-    
-    ax.tick_params(axis = 'both', which = 'major', labelsize = 12)
-    ax.tick_params(axis = 'both', which = 'minor', labelsize = 12)
-        
-    patch = mpatches.Patch(facecolor="#D8D8D8", edgecolor = "red", linewidth = "1.5", label="{} Underlying Gaussians".format(peaks))
-    plt.legend(handles=[patch], fontsize = 14, bbox_to_anchor=(1.35, 0.5), loc="center", frameon = False)
-    
-    count += 1
-        
-    # Iterate over each underlying Gaussian distribution, plotting and printing summary statistics for each:
-    print "Video {}:\n".format(count)
-    for i in range(clf.n_components):
-        pdf = clf.weights_[i] * stats.norm(clf.means_[i, 0], np.sqrt(clf.covars_[i, 0])).pdf(xpdf)
-        print "Gaussian {}:".format(i+1), "AUC: {:.3f};".format(clf.weights_[i]), "Mean: %.4f;" % round(clf.means_[i], 4), "Covariance: %.3f" % round(clf.covars_[i], 3)
-        plt.fill(xpdf, pdf, facecolor = "grey", edgecolor= None, alpha=0.5)
-        plt.xlim(-2, 7);
-    
-    print "Sum of AUC weights:", sum(clf.weights_)
-    print "AIC: {:.2f}".format(clf.aic(max_vector_log))
-    print "BIC: {:.2f}\n".format(clf.bic(max_vector_log))
-
-    # Check the posterior probability of any number falling within each model's n Gaussians:
-    def posterior_prob_check(num): 
-        for i in clf.predict_proba(num):
-            count2 = 1
-            for k in i:
-                print "Posterior probability of {} falling under Gaussian {} = {:.4f}".format(num, count2, k)
-                count2 += 1
-                
-    posterior_prob_check(0.5)
-    print ""
-    #break
-    
-          
-# get weights, means, sd for each; get AIC (should be for each composite, I think?):
-# http://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/modules/generated/sklearn.mixture.GMM.html
-
-
-# In[NEW]
-
-### K-MEANS CLUSTERING FOR 2-DIMENSIONAL DATA ###
-
-# NOTE: We can definitely streamline this function so that it is less laborious to prepare the data to be entered and passed through it.
-# I am going to work on that today.
-
-def kmeans_cluster(input_data, clusters):
-    reshaped_input = input_data
-    reshaped_input.shape = (reshaped_input.shape[0],1)
-    kmeans = KMeans(n_clusters = clusters)
-    kmeans.fit(reshaped_input)
-    
-    centroids = kmeans.cluster_centers_
-    labels = kmeans.labels_
-    
-    colors = ["g.", "r."]
-    
-    for i in range(len(reshaped_input)):
-        #print("coordinate:", reshaped_input[i])
-        plt.plot(reshaped_input[i][0], colors[labels[i]])
-        sns.despine()
-
-# An example of the input might be (tuples?) of sum_sq_diff values and Pearson's correlation coefficient values for each frame,
-# or any other statistics that we might try that could be collected on a frame-by-frame basis.
-kmeans_cluster(INPUT_GOES_HERE[1], 2)
-
-
-# In[393]:
-
+# ::: I should probably run this 10-20 (or more?) times and select the modal BIC value for plotting
+# ::: and future use, to hedge against the prospect of an improbable BIC score winning out.
 
 ### MODEL COMPARISONS ###
 
@@ -416,7 +395,7 @@ for max_vector_log in max_vector_logs:
     max_vector_log.shape = (max_vector_log.shape[0],1)
     
     # Test models for each video against a range of GMMs with between 1 and 10 underlying Gaussians:
-    n_estimators = np.arange(1, 10)
+    n_estimators = np.arange(1, 15)
     clfs = [GMM(n, n_iter=1000).fit(max_vector_log) for n in n_estimators]
     aics = [clf.aic(max_vector_log) for clf in clfs]
     bics = [clf.bic(max_vector_log) for clf in clfs]
@@ -432,7 +411,7 @@ for max_vector_log in max_vector_logs:
     fig = plt.figure() 
     ax = fig.add_subplot(111)  
     
-    fig.suptitle("Comparing n-Gaussian Models\n via AIC and BIC Testing: (Video {})".format(count), fontsize=16)
+    fig.suptitle("Comparing 1-Dimensional n-Gaussian Models\n via AIC and BIC Testing: Video {}".format(count), fontsize=16)
 
     fig.subplots_adjust(top=header_space - .05)
 
@@ -456,7 +435,281 @@ print min_aics
 print min_bics
 
 
-# In[15]:
+# In[ ]:
+
+
+### PLOT GAUSSIAN MIXTURE MODEL W/ LOWEST BIC SCORE PER VIDEO ###
+# http://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/modules/generated/sklearn.mixture.GMM.html
+
+def Gaussian_mixture_model(posterior_probability_check = None):
+
+    optimal_peaks = []
+    
+    for item in range(len(max_vector_logs)):
+        optimal_peaks.append(min_bics[item])
+    
+    palette = sns.cubehelix_palette(n_colors = len(max_vector_logs), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
+
+    count = 0
+
+    # Save some values to use later:
+    xpdf_list = []
+    density_list = []
+    clf_list = []
+
+    # Iterate over max_vector_logs to generate histograms and composite Gaussians
+    for max_vector_log in max_vector_logs:
+
+        # Reshape the data to facilitate Gaussian modeling:
+        max_vector_log.shape = (max_vector_log.shape[0],1)
+
+        # Set the Gaussian mixed model to fit 2 Gaussians;
+        # conduct 300 iterations to determine the best fit:
+        clf = GMM(optimal_peaks[count], n_iter = 300).fit(max_vector_log)
+        clf_list.append(clf)
+
+        # Reshape the data to facilitate probability density polotting:
+        xpdf = np.linspace(-2, 7, 1000)
+        xpdf.shape = (xpdf.shape[0], 1)
+        xpdf_list.append(xpdf)
+
+        density = np.exp(clf.score(xpdf))
+        density_list.append(density)
+
+        # Generate plots:
+        fig = plt.figure()
+
+        plt.hist(max_vector_log, 10, normed = True, color = palette[count], alpha = 1)
+        plt.plot(xpdf, density, "r-")
+        plt.xlim(-2, 7)
+        fig.set_size_inches(size)
+
+        fig.suptitle("1-Dimensional Gaussian Mixture Model:\nFreezing and Motion Frames: Video {}".format(count + 1), fontsize=16)
+
+        fig.subplots_adjust(top=header_space - .05)
+
+        ax = plt.gca()
+
+        ax.set_xlabel("Log-Transformed Maximum Filter Score", fontsize = 15)
+        ax.set_ylabel("Probability Density", fontsize = 15)
+
+        ax.tick_params(axis = 'both', which = 'major', labelsize = 12)
+        ax.tick_params(axis = 'both', which = 'minor', labelsize = 12)
+
+        patch = mpatches.Patch(facecolor="#D8D8D8", edgecolor = "red", linewidth = "1.5", label="Winning model:\n{} Underlying Gaussians\nBIC: {:.2f}".format(optimal_peaks[count], clf.bic(max_vector_log)))
+        plt.legend(handles=[patch], fontsize = 14, bbox_to_anchor=(1.35, 0.5), loc="center", frameon = False)
+
+        count += 1
+        
+        # Check the posterior probability of any number falling within each model's n Gaussians:
+        
+        posteriors = []
+        
+        def posterior_prob_check(num):
+            # Check to see whether the user has entered the optional argument posterior_probability_check
+            if posterior_probability_check != None:
+                # Iterate over each clf.predict_proba np.array:
+                for i in clf.predict_proba(num):
+                    # Pull each value out of its respective array and append it to posteriors = []
+                    for k in i:
+                        posteriors.append(k)
+            else:
+                pass
+            
+        posterior_prob_check(posterior_probability_check)
+                
+        # Iterate over each underlying Gaussian distribution, plotting and printing summary statistics for each:
+        print "Video {}:\n".format(count)
+        for i in range(clf.n_components):
+            pdf = clf.weights_[i] * stats.norm(clf.means_[i, 0], np.sqrt(clf.covars_[i, 0])).pdf(xpdf)
+            print "Gaussian {}:".format(i+1), "AUC: {:.3f};".format(clf.weights_[i]), "Mean: %.4f;" % round(clf.means_[i], 4), "Covariance: %.3f;" % round(clf.covars_[i], 3), "Posterior probability of {}:".format(posterior_probability_check), "%.4f" % round(posteriors[i], 3)
+            plt.fill(xpdf, pdf, facecolor = "grey", edgecolor= None, alpha=0.5)
+            plt.xlim(-2, 7);
+        print ""
+        plt.show()
+        print ""
+    
+Gaussian_mixture_model(0.5)
+
+
+# In[ ]:
+
+
+### PLOT GAUSSIAN MIXTURE MODEL W/ LOWEST BIC SCORE PER VIDEO ###
+# http://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/modules/generated/sklearn.mixture.GMM.html
+
+def Gaussian_mixture_model(posterior_probability_check = None):
+
+    optimal_peaks = []
+    
+    for item in range(len(max_vector_logs)):
+        optimal_peaks.append(min_bics[item])
+    
+    palette = sns.cubehelix_palette(n_colors = len(max_vector_logs), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
+
+    count = 0
+
+    # Save some values to use later:
+    xpdf_list = []
+    density_list = []
+    clf_list = []
+
+    # Iterate over max_vector_logs to generate histograms and composite Gaussians
+    for max_vector_log in max_vector_logs:
+
+        # Reshape the data to facilitate Gaussian modeling:
+        max_vector_log.shape = (max_vector_log.shape[0],1)
+
+        # Set the Gaussian mixed model to fit 2 Gaussians;
+        # conduct 300 iterations to determine the best fit:
+        clf = GMM(optimal_peaks[count], n_iter = 300).fit(max_vector_log)
+        clf_list.append(clf)
+
+        # Reshape the data to facilitate probability density polotting:
+        xpdf = np.linspace(-2, 7, 1000)
+        xpdf.shape = (xpdf.shape[0], 1)
+        xpdf_list.append(xpdf)
+
+        density = np.exp(clf.score(xpdf))
+        density_list.append(density)
+
+        # Generate plots:
+        fig = plt.figure()
+
+        plt.hist(max_vector_log, 10, normed = True, color = palette[count], alpha = 1)
+        plt.plot(xpdf, density, "r-")
+        plt.xlim(-2, 7)
+        fig.set_size_inches(size)
+
+        fig.suptitle("1-Dimensional Gaussian Mixture Model:\nFreezing and Motion Frames: Video {}".format(count + 1), fontsize=16)
+
+        fig.subplots_adjust(top=header_space - .05)
+
+        ax = plt.gca()
+
+        ax.set_xlabel("Log-Transformed Maximum Filter Score", fontsize = 15)
+        ax.set_ylabel("Probability Density", fontsize = 15)
+
+        ax.tick_params(axis = 'both', which = 'major', labelsize = 12)
+        ax.tick_params(axis = 'both', which = 'minor', labelsize = 12)
+
+        patch = mpatches.Patch(facecolor="#D8D8D8", edgecolor = "red", linewidth = "1.5", label="Winning model:\n{} Underlying Gaussians\nBIC: {:.2f}".format(optimal_peaks[count], clf.bic(max_vector_log)))
+        plt.legend(handles=[patch], fontsize = 14, bbox_to_anchor=(1.35, 0.5), loc="center", frameon = False)
+
+        count += 1
+        
+        # Check the posterior probability of any number falling within each model's n Gaussians:
+        
+        posteriors = []
+        
+        def posterior_prob_check(num):
+            # Check to see whether the user has entered the optional argument posterior_probability_check
+            if posterior_probability_check != None:
+                # Iterate over each clf.predict_proba np.array:
+                for i in clf.predict_proba(num):
+                    # Pull each value out of its respective array and append it to posteriors = []
+                    for k in i:
+                        posteriors.append(k)
+            else:
+                pass
+            
+        posterior_prob_check(posterior_probability_check)
+                
+        # Iterate over each underlying Gaussian distribution, plotting and printing summary statistics for each:
+        print "Video {}:\n".format(count)
+        for i in range(clf.n_components):
+            pdf = clf.weights_[i] * stats.norm(clf.means_[i, 0], np.sqrt(clf.covars_[i, 0])).pdf(xpdf)
+            print "Gaussian {}:".format(i+1), "AUC: {:.3f};".format(clf.weights_[i]), "Mean: %.4f;" % round(clf.means_[i], 4), "Covariance: %.3f;" % round(clf.covars_[i], 3), "Posterior probability of {}:".format(posterior_probability_check), "%.4f" % round(posteriors[i], 3)
+            plt.fill(xpdf, pdf, facecolor = "grey", edgecolor= None, alpha=0.5)
+            plt.xlim(-2, 7);
+        print ""
+        plt.show()
+        print ""
+    
+Gaussian_mixture_model(0.5)
+
+
+# ### K-MEANS CLUSTERING FOR 2-DIMENSIONAL DATA
+# 
+
+# In[ ]:
+
+
+# Trying to prep the r_squared_values_list and max_vector_logs data for k-means clustering
+
+q = np.asarray(r_squared_values_list[1])
+z = max_vector_logs[1]
+
+
+qz = np.concatenate([q, max_vector_logs])
+print qz[:1]
+
+print q[1], z[1]
+print type(r_squared_values_list[1])
+print type(max_vector_logs[1])
+
+
+# In[ ]:
+
+
+x = np.array([[1, 2], [3, 2], [5, 8], [7, 3], [8, 6], [2, 1], [1, 1], [6, 6], [5, 4], [2, 2], [7, 7]])
+plt.scatter(x[:, 0], x[:, 1], s = 40)
+plt.show()
+
+
+# In[ ]:
+
+
+def kmeans_cluster(input_data, clusters):
+    reshaped_input = input_data
+    #reshaped_input.shape = (reshaped_input.shape[0],1)
+    kmeans = KMeans(n_clusters = clusters)
+    kmeans.fit(reshaped_input)
+    
+    centroids = kmeans.cluster_centers_
+    labels = kmeans.labels_
+    
+    colors = 10*["orange", "blue", "green", "red"]
+    markers = ["x", "^"]
+    
+    count = 0
+    
+    for i in range(len(reshaped_input)):
+        #print("coordinate:", reshaped_input[i])
+        plt.plot(reshaped_input[i][0], reshaped_input[i][1], colors[labels[i]], marker = ".", markersize = 10)
+        sns.despine()
+    plt.scatter(centroids[:, 0], centroids[:, 1], marker = ".", color = "black", s = 150, linewidths = 20, alpha = 0.15)
+
+
+# In[ ]:
+
+
+kmeans_cluster(x, 2)
+
+
+# In[ ]:
+
+
+clf = KMeans(n_clusters = 2)
+clf.fit(x)
+centroids = clf.cluster_centers_
+labels = clf.labels_
+
+#palette = sns.cubehelix_palette(n_colors = len(labels), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
+
+#count = 0
+
+for i in range(len(x)):
+    plt.plot(x[i][0], x[i][1], markersize = 10)
+plt.scatter(centroids[:, 0], centroids[:, 1], marker = "x", color = "red", s = 150, linewidths = 5)
+plt.show()
+    #count += 1
+
+
+# ### Map natural log values to their respective time points
+# 
+
+# In[ ]:
 
 
 # Map natural log values to their respective time points:
@@ -486,19 +739,11 @@ for log in max_vector_logs:
     ax.legend(bbox_to_anchor=(1.34, 0.5), loc="center", borderaxespad=0., fontsize = 14, frameon=False, handletextpad=.5)
     
     count += 1
-    
-    
-#################################################################################
-#################################################################################
-########## NO NEED TO PROCEED PAST THIS POINT FOR OUR PSC 290 PROJECT############
-#################################################################################
-#################################################################################
-
 
 
 # ## Back Converting Natural Logs to their Antilogs:
 
-# In[10]:
+# In[ ]:
 
 
 ### THERE IS NO NEED TO RUN THIS CODE. THIS IS JUST VERIFICATION THAT OUR NLOG CONVERSIONS ARE REVERSIBLE. ###
@@ -538,7 +783,7 @@ for log in max_vector_logs:
 # # but I need to think a bit more about what this has bought us.
 
 
-# In[38]:
+# In[ ]:
 
 
 # freezing_logs = []
@@ -558,13 +803,13 @@ for log in max_vector_logs:
 # ## Currently a lower priority. 
 # ## Eventually, need to work out a way to do this task iteratively.
 
-# In[31]:
+# In[ ]:
 
 
 video_to_export = VideoFileClip("motion_test.mov")
 
 
-# In[17]:
+# In[ ]:
 
 
 test_mask = freezing
@@ -574,13 +819,13 @@ def test_func(t):
     return test_mask[int(round(t*30))]*100 #How did we arrive at this?
 
 
-# In[33]:
+# In[ ]:
 
 
 print test_mask.shape
 
 
-# In[18]:
+# In[ ]:
 
 
 from moviepy.editor import *
@@ -608,7 +853,7 @@ final = CompositeVideoClip([clip, clip2], size = clip.size)
 final.write_videofile("motion_test_outcomeII.mp4")
 
 
-# In[128]:
+# In[ ]:
 
 
 a = 5
