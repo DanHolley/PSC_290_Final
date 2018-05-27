@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[33]:
+# In[1]:
 
 
 # If memory/processing speed becomes an issue, may need to launch Jupyter from terminal with 
@@ -115,7 +115,7 @@ for video in video_files:
     axarr[2].imshow(diff_frame)
 
 
-# In[65]:
+# In[6]:
 
 
 ###PLOT AND STORE RAW, NORMALIZED, AND LOG-TRANSFORMED/NORMALIZED R-SQUARED VALUES ###
@@ -188,13 +188,13 @@ for values in r_squared_values_list:
     # Unadjusted r-squared scores:
     ax[0].set_ylabel('frames', fontsize = 15)
     ax[0].set_xlabel('raw r-squared value', fontsize = 15)
-    ax[0].hist(values, bins=25, color = palette[count]);
+    ax[0].hist(values, edgecolor = "black", bins=25, color = palette[count]);
     ax[0].set_ylim(bottom=0)
     ax[0].set_xlim(left=min(values), right=max(values))
 
     # Normalized r-squared scores:
     ax[1].set_xlabel('normalized r-squared value', fontsize = 15)
-    ax[1].hist(temp_normalized_values, bins=25, color = palette[count]);
+    ax[1].hist(temp_normalized_values, edgecolor = "black", bins=25, color = palette[count]);
     ax[1].set_ylim(bottom=0)
     ax[1].set_xlim(left=min(temp_normalized_values), right=max(temp_normalized_values))
     
@@ -202,7 +202,7 @@ for values in r_squared_values_list:
     plot_me = temp_log_transformed_normalized_values - min(temp_log_transformed_normalized_values)
     #print np.median
     ax[2].set_xlabel('log-transformed normalized\nr-squared value', fontsize = 15)
-    ax[2].hist(plot_me, bins=25, color = palette[count]);
+    ax[2].hist(plot_me, edgecolor = "black", bins=25, color = palette[count]);
     ax[2].set_ylim(bottom=0)
     ax[2].set_xlim(left=0, right=max(plot_me))
     ax[2].axvline(x = np.median(plot_me), c = "r", dashes = [1, 2], label = "median:\n{:.2f}".format(np.median(plot_me)))
@@ -210,12 +210,12 @@ for values in r_squared_values_list:
     
     # Store each list of normalized r-squared values outside the loop for later use:
     normalized_r2_values.append(temp_normalized_values)
-    log_transformed_normalized_r2_values.append(temp_log_transformed_normalized_values)
+    log_transformed_normalized_r2_values.append(plot_me)
         
     count += 1
 
 
-# In[ ]:
+# In[7]:
 
 
 # Several lists generated in the following for loop will need to be saved as lists of sub-lists for later use:
@@ -254,7 +254,7 @@ for sum_of_sq_differences in sum_sq_diff_list:
 
     plt.plot(my_ordered_array, min_vector, 'b-', label = "minimum filter", alpha = .5, linewidth = 2)
     plt.plot(my_ordered_array, max_vector, 'g-', label = "maximum filter", alpha = .5, linewidth = 2)
-    plt.plot(my_ordered_array, normalized_r2_values[count], 'r-', label = "r-squared values", alpha = .5, linewidth = 2)
+    plt.plot(my_ordered_array, normalized_r2_values[count], 'r-', label = "normalized\nr-squared values", alpha = .5, linewidth = 2)
 
     ax.legend(bbox_to_anchor=(1.25, 0.5), loc="center", borderaxespad=0., fontsize = 14, frameon=False, handletextpad=.5)
     
@@ -267,7 +267,7 @@ for sum_of_sq_differences in sum_sq_diff_list:
     count += 1
 
 
-# In[ ]:
+# In[8]:
 
 
 freezing_list = []
@@ -312,7 +312,7 @@ for min_vector in min_vectors_list:
     count += 1
 
 
-# In[ ]:
+# In[9]:
 
 
 # Plot the maximum vector scores from each video as a histogram to visualize
@@ -322,60 +322,47 @@ palette = sns.cubehelix_palette(n_colors = len(max_vectors_list), start = 2.8, r
 
 count = 0
 
-for max_vector in max_vectors_list:
-    fig = plt.figure()
-    fig.suptitle('Distribution of Maximum Filter Scores: Video{}'.format(count + 1), fontsize=15)
-
-    ax = fig.add_subplot(111)
-    fig.subplots_adjust(top=header_space)
-    fig.set_size_inches(size)
-
-    ax.set_xlabel('maximum filter score', fontsize = 15)
-    ax.set_ylabel('frames', fontsize = 15)
-
-    plt.hist(max_vector, bins=50, color = palette[count]);
-    plt.gca().set_ylim(bottom=0)
-    plt.gca().set_xlim(left=0)
-    
-    count += 1
-
-
-# In[ ]:
-
-
-### LOG TRANSFORMED PLOTS ###
-# Transforming the data to their natural logs will facilitate better visualization and analysis.
-
 max_vector_logs = []
 
-palette = sns.cubehelix_palette(n_colors = len(max_vectors_list), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
-
-count = 0
+red_palette = 10*["#F5C1C0", "#F7CECD", "#F9DADA", "#FBE7E6"]
 
 for max_vector in max_vectors_list:
-    # Log-transform the data with an added constant to avoid negative values:
+
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 3), sharex=False, sharey=False, subplot_kw={'adjustable': 'box-forced'})
+    fig.suptitle('Maximum Filter Scores: Video {}'.format(count + 1), fontsize=15)
+    fig.subplots_adjust(top=.85)
+    ax = axes.ravel()
+
+    # Raw max filter scores:
+    ax[0].set_ylabel('frames', fontsize = 15)
+    ax[0].set_xlabel('raw max filter scores', fontsize = 15)
+    ax[0].hist(max_vector, edgecolor = "black", bins=10, color = palette[count]);
+    ax[0].set_ylim(bottom=0)
+    ax[0].set_xlim(left=min(max_vector), right=max(max_vector))
+
+    # Log-transformed max filter scores:
     max_vector_log = np.log(max_vector + 1 - min(max_vector))
     max_vector_logs.append(max_vector_log)
+    ax[1].set_xlabel('log-transformed max filter scores', fontsize = 15)
+    ax[1].hist(max_vector_log, edgecolor = "black", bins=10, color = palette[count]);
+    ax[1].set_ylim(bottom=0)
+    ax[1].set_xlim(left=min(max_vector_log), right=max(max_vector_log))
+    ax[1].axvline(x = np.median(max_vector_log), c = "r", dashes = [1, 2], label = "median:\n{:.2f}".format(np.median(max_vector_log)))
+    ax[1].legend(bbox_to_anchor=(1.02, 1.035), loc="upper right", borderaxespad=0., fontsize = 14, frameon=True, framealpha=1, edgecolor = "inherit", handletextpad=.5)
 
-    # Generate log-transformed plots:
-    fig = plt.figure()
-    fig.suptitle('Distribution of Log-Transformed Maximum Filter Scores: Video {}'.format(count + 1), fontsize=15)
-    fig.set_size_inches(size)
+    # Overlay comparison of log-transformed max filter scores and log-transformed normalized r-squared values:
+    ax[2].set_xlabel('log-transformed r-squared overlay', fontsize = 15)
+    ax[2].hist(max_vector_log, edgecolor = "black", bins=10, color = palette[count]);
+    ax[2].hist(log_transformed_normalized_r2_values[count], bins=10, color = "r", alpha = .25 - (0.05*count));
+    ax[2].set_ylim(bottom=0)
+    ax[2].set_xlim(left=0, right=max(max_vector_log))
+    patch = mpatches.Patch(facecolor=red_palette[count], edgecolor = "black", label="log-transformed\nr-squared values")
+    ax[2].legend(handles=[patch], fontsize = 12, edgecolor = "inherit", framealpha=1, bbox_to_anchor=(1.20, 1.07), loc="upper right", frameon = True)
 
-    ax = fig.add_subplot(111)
-    fig.subplots_adjust(top=header_space)
-
-    ax.set_xlabel('log-transformed maximum filter score', fontsize = 15)
-    ax.set_ylabel('frames', fontsize = 15)
-
-    plt.hist(max_vector_log, color = palette[count])
-    plt.gca().set_ylim(bottom=0)
-    plt.gca().set_xlim(left=0, right=max(max_vector_log))
-    
     count += 1
 
 
-# In[ ]:
+# In[10]:
 
 
 # ::: I should probably run this 10-20 (or more?) times and select the modal BIC value for plotting
@@ -435,7 +422,7 @@ print min_aics
 print min_bics
 
 
-# In[ ]:
+# In[11]:
 
 
 ### PLOT GAUSSIAN MIXTURE MODEL W/ LOWEST BIC SCORE PER VIDEO ###
@@ -532,104 +519,7 @@ def Gaussian_mixture_model(posterior_probability_check = None):
 Gaussian_mixture_model(0.5)
 
 
-# In[ ]:
-
-
-### PLOT GAUSSIAN MIXTURE MODEL W/ LOWEST BIC SCORE PER VIDEO ###
-# http://ogrisel.github.io/scikit-learn.org/sklearn-tutorial/modules/generated/sklearn.mixture.GMM.html
-
-def Gaussian_mixture_model(posterior_probability_check = None):
-
-    optimal_peaks = []
-    
-    for item in range(len(max_vector_logs)):
-        optimal_peaks.append(min_bics[item])
-    
-    palette = sns.cubehelix_palette(n_colors = len(max_vector_logs), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
-
-    count = 0
-
-    # Save some values to use later:
-    xpdf_list = []
-    density_list = []
-    clf_list = []
-
-    # Iterate over max_vector_logs to generate histograms and composite Gaussians
-    for max_vector_log in max_vector_logs:
-
-        # Reshape the data to facilitate Gaussian modeling:
-        max_vector_log.shape = (max_vector_log.shape[0],1)
-
-        # Set the Gaussian mixed model to fit 2 Gaussians;
-        # conduct 300 iterations to determine the best fit:
-        clf = GMM(optimal_peaks[count], n_iter = 300).fit(max_vector_log)
-        clf_list.append(clf)
-
-        # Reshape the data to facilitate probability density polotting:
-        xpdf = np.linspace(-2, 7, 1000)
-        xpdf.shape = (xpdf.shape[0], 1)
-        xpdf_list.append(xpdf)
-
-        density = np.exp(clf.score(xpdf))
-        density_list.append(density)
-
-        # Generate plots:
-        fig = plt.figure()
-
-        plt.hist(max_vector_log, 10, normed = True, color = palette[count], alpha = 1)
-        plt.plot(xpdf, density, "r-")
-        plt.xlim(-2, 7)
-        fig.set_size_inches(size)
-
-        fig.suptitle("1-Dimensional Gaussian Mixture Model:\nFreezing and Motion Frames: Video {}".format(count + 1), fontsize=16)
-
-        fig.subplots_adjust(top=header_space - .05)
-
-        ax = plt.gca()
-
-        ax.set_xlabel("Log-Transformed Maximum Filter Score", fontsize = 15)
-        ax.set_ylabel("Probability Density", fontsize = 15)
-
-        ax.tick_params(axis = 'both', which = 'major', labelsize = 12)
-        ax.tick_params(axis = 'both', which = 'minor', labelsize = 12)
-
-        patch = mpatches.Patch(facecolor="#D8D8D8", edgecolor = "red", linewidth = "1.5", label="Winning model:\n{} Underlying Gaussians\nBIC: {:.2f}".format(optimal_peaks[count], clf.bic(max_vector_log)))
-        plt.legend(handles=[patch], fontsize = 14, bbox_to_anchor=(1.35, 0.5), loc="center", frameon = False)
-
-        count += 1
-        
-        # Check the posterior probability of any number falling within each model's n Gaussians:
-        
-        posteriors = []
-        
-        def posterior_prob_check(num):
-            # Check to see whether the user has entered the optional argument posterior_probability_check
-            if posterior_probability_check != None:
-                # Iterate over each clf.predict_proba np.array:
-                for i in clf.predict_proba(num):
-                    # Pull each value out of its respective array and append it to posteriors = []
-                    for k in i:
-                        posteriors.append(k)
-            else:
-                pass
-            
-        posterior_prob_check(posterior_probability_check)
-                
-        # Iterate over each underlying Gaussian distribution, plotting and printing summary statistics for each:
-        print "Video {}:\n".format(count)
-        for i in range(clf.n_components):
-            pdf = clf.weights_[i] * stats.norm(clf.means_[i, 0], np.sqrt(clf.covars_[i, 0])).pdf(xpdf)
-            print "Gaussian {}:".format(i+1), "AUC: {:.3f};".format(clf.weights_[i]), "Mean: %.4f;" % round(clf.means_[i], 4), "Covariance: %.3f;" % round(clf.covars_[i], 3), "Posterior probability of {}:".format(posterior_probability_check), "%.4f" % round(posteriors[i], 3)
-            plt.fill(xpdf, pdf, facecolor = "grey", edgecolor= None, alpha=0.5)
-            plt.xlim(-2, 7);
-        print ""
-        plt.show()
-        print ""
-    
-Gaussian_mixture_model(0.5)
-
-
-# ### K-MEANS CLUSTERING FOR 2-DIMENSIONAL DATA
+# ### K-MEANS CLUSTERING FOR 2-DIMENSIONAL DATA (IN PROGRESS)
 # 
 
 # In[ ]:
@@ -706,7 +596,8 @@ plt.show()
     #count += 1
 
 
-# ### Map natural log values to their respective time points
+# ### Map natural log values to their respective time points (DIAGNOSTIC PURPOSES ONLY)
+# 
 # 
 
 # In[ ]:
@@ -741,7 +632,7 @@ for log in max_vector_logs:
     count += 1
 
 
-# ## Back Converting Natural Logs to their Antilogs:
+# ### Back Converting Natural Logs to their Antilogs (DIAGNOSTIC PURPOSES ONLY)
 
 # In[ ]:
 
@@ -783,24 +674,8 @@ for log in max_vector_logs:
 # # but I need to think a bit more about what this has bought us.
 
 
-# In[ ]:
-
-
-# freezing_logs = []
-
-# for freezing in freezing_list:
-#     freezing_log = np.log(freezing + 1 - min(freezing))
-#     freezing_logs.append(freezing_log)
-    
-# len(freezing_logs)
-# print len(freezing_logs[1])
-
-# print freezing_logs[1]
-# print max_vector_logs[1]
-
-
 # ## Video exporting begins here.
-# ## Currently a lower priority. 
+# ## Currently a lower priority--WE DO NOT NEED TO WORK ON THIS FOR PSC 290
 # ## Eventually, need to work out a way to do this task iteratively.
 
 # In[ ]:
@@ -851,15 +726,4 @@ clip2.mask.get_frame = lambda t: circle(screensize=(clip.w,clip.h),
 final = CompositeVideoClip([clip, clip2], size = clip.size)
 
 final.write_videofile("motion_test_outcomeII.mp4")
-
-
-# In[ ]:
-
-
-a = 5
-b = 10
-print "1: ", "a + b" # Python treats this as a literal string of characters, not as variables or math.
-print "2: ", a + b # Python treats this as a math operation performed on two variables, which store integers.
-print "3: ", a, "a + b" # Here, we're concatenating a variable (which stores an integer) and a character string.
-print "4: ", str(a + b) # Here, we're doing a math operation on two variables, then storing the output as a string.
 
