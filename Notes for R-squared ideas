@@ -1,0 +1,5 @@
+High r-squared values indicate the high correlations 
+Thus, videos having more motions should produce higher r-squared than the vidoes with less motions.
+Given the r-squared are computed between frames on pixals... all the r-squred should have high values!!
+Probably no need to nomalize the r-squared before the log-transformation
+Pinpoint the problemic video frame!! (given some frames have lower r-sqaured which should not happen) and plot them!
