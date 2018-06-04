@@ -136,13 +136,14 @@ for values in r_squared_values_list:
     
     # Iterate over each r-squared value, to get/store normalized and log-transformed/normalized values:
     for value in values:
-        
+        ###may be we can try different normalization method? such as - norm_value=(1/value)
+      
         # Get normalized values:
         norm_value = (1 - value) * 100
         temp_normalized_values.append(norm_value)
         
         # Get log-transformed normalized values:
-        log_transformed = np.log(norm_value) # Constant added to avoid negative values
+        log_transformed = np.log(norm_value) # Constant added to avoid negative values(Paprika)
         if np.isfinite(log_transformed) == True:
             temp_log_transformed_normalized_values.append(log_transformed)
         else:
@@ -180,7 +181,7 @@ for values in r_squared_values_list:
     outliers_list.append(outliers)
     
     # Plot histograms of the normalized r-squared values:
-    
+    ## How do we set up the ylim so that all the value will be on the same scale? (paprika)
     fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 3), sharex=False, sharey=False, subplot_kw={'adjustable': 'box-forced'})
     fig.suptitle('R-Squared Values: Video {}'.format(count + 1), fontsize=15)
     ax = axes.ravel()
