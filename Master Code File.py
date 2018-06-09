@@ -633,82 +633,129 @@ Gaussian_mixture_model(0.5)
 # ### K-MEANS CLUSTERING FOR 2-DIMENSIONAL DATA
 # 
 
-# In[ ]:
+# In[45]:
 
 
-# Trying to prep the r_squared_values_list and max_vector_logs data for k-means clustering
+### ZIPPING SSD, LOG-NORM MAX FILTER, AND LOG-NORM R2 LISTS FOR K-MEANS CLUSTERING ###
 
-q = np.asarray(r_squared_values_list[1])
-z = max_vector_logs[1]
+ssd_finite = []
+log_max_filter_finite = []
+log_r2_finite = []
 
+zipped_ssd_max = []
+zipped_r2_max = []
 
-qz = np.concatenate([q, max_vector_logs])
-print qz[:1]
+zipped_lists = []
 
-print q[1], z[1]
-print type(r_squared_values_list[1])
-print type(max_vector_logs[1])
+zipped_list_names = []
 
+# Before zipping, we need to drop NaNs and infinite values; otherwise, they error-out later:
+for i in ssd_logs:
+    temp_ssd = []
+    for j in i:
+        if (np.isnan(j) == False and np.isfinite(j) == True):
+            temp_ssd.append(j)
+        else:
+            pass
+    ssd_finite.append(temp_ssd)
 
-# In[ ]:
-
-
-x = np.array([[1, 2], [3, 2], [5, 8], [7, 3], [8, 6], [2, 1], [1, 1], [6, 6], [5, 4], [2, 2], [7, 7]])
-plt.scatter(x[:, 0], x[:, 1], s = 40)
-plt.show()
-
-
-# In[ ]:
-
-
-def kmeans_cluster(input_data, clusters):
-    reshaped_input = input_data
-    #reshaped_input.shape = (reshaped_input.shape[0],1)
-    kmeans = KMeans(n_clusters = clusters)
-    kmeans.fit(reshaped_input)
+for i in max_vector_logs:
+    temp_max_filter = []
+    for j in i:
+        if (np.isnan(j) == False and np.isfinite(j) == True):
+            temp_max_filter.append(j)
+        else:
+            pass
+    log_max_filter_finite.append(temp_max_filter)
     
-    centroids = kmeans.cluster_centers_
-    labels = kmeans.labels_
+for i in log_transformed_normalized_r2_values:
+    temp_log_r2 = []
+    for j in i:
+        if (np.isnan(j) == False and np.isfinite(j) == True):
+            temp_log_r2.append(j)
+        else:
+            pass
+    log_r2_finite.append(temp_log_r2)
+
+# Iterate over and zip the finite, NaN-free lists:
+for i in range(len(ssd_logs)):
+    zipped_ssd_max.append(zip(ssd_finite[i], log_max_filter_finite[i]))
+zipped_lists.append(zipped_ssd_max)
+zipped_list_names.append(["SSD", "log max filter score"])
     
-    colors = 10*["orange", "blue", "green", "red"]
-    markers = ["x", "^"]
+for i in range(len(ssd_logs)):
+    zipped_r2_max.append(zip(log_r2_finite[i], log_max_filter_finite[i]))
+zipped_lists.append(zipped_r2_max)
+zipped_list_names.append(["log-norm r-squared values", "log max filter score"])
+
+
+# In[70]:
+
+
+colors = ["#A9E5BB", "#00B0CB", '#F7DB2A', "#DB0000", "#7F5484"] * 10
+
+count = 0
+
+count_2 = 0
+
+optimal_peaks_expanded = optimal_peaks * 10
+
+zipped_list_names_expanded = zipped_list_names * 10
+
+video_number = []
+
+for k, v in enumerate(video_files):
+    video_number.append(k + 1)
     
-    count = 0
-    
-    for i in range(len(reshaped_input)):
-        #print("coordinate:", reshaped_input[i])
-        plt.plot(reshaped_input[i][0], reshaped_input[i][1], colors[labels[i]], marker = ".", markersize = 10)
-        sns.despine()
-    plt.scatter(centroids[:, 0], centroids[:, 1], marker = ".", color = "black", s = 150, linewidths = 20, alpha = 0.15)
+video_number_expanded = video_number * 10
+
+for zipped_list in zipped_lists:
+        
+    for values in zipped_list:
+        
+        kmeans = KMeans(n_clusters = optimal_peaks_expanded[count])
+        kmeans.fit(values)
+
+        centroids = kmeans.cluster_centers_
+        labels = kmeans.labels_
+
+        fig = plt.figure() 
+        ax = fig.add_subplot(111)
+
+        fig.suptitle("K-Means Clustering: {} Centroids (Video {})".format(optimal_peaks_expanded[count], video_number_expanded[count]), fontsize=14)
+                
+        if count_2 <= 3:
+            x_lab = 0
+        else:
+            x_lab = 1
+        
+        for i in range(len(values)):
+            plt.plot(values[i][0], values[i][1], colors[labels[i]], marker = ".", markersize = 8, alpha = 1, zorder = 1)
+            ax.set_xlabel("{}".format(zipped_list_names_expanded[x_lab][0]), fontsize = 14)
+            ax.set_ylabel("{}".format(zipped_list_names_expanded[0][1]), fontsize = 14)
+            sns.despine()
+        count_2 += 1
+
+        # Show the centroids:
+        plt.scatter(centroids[:, 0], centroids[:, 1], marker = ".", color = "lightgrey", linewidths = 1.5, edgecolors = "black", s = 400, zorder = 2, label="k-means\ncentroid")
+        plt.legend(fontsize = 12, edgecolor = "inherit", framealpha=0.5, bbox_to_anchor=(1.25, 0.5), loc="center", frameon = True)
+
+        count += 1
 
 
-# In[ ]:
-
-
-kmeans_cluster(x, 2)
-
-
-# In[ ]:
-
-
-clf = KMeans(n_clusters = 2)
-clf.fit(x)
-centroids = clf.cluster_centers_
-labels = clf.labels_
-
-#palette = sns.cubehelix_palette(n_colors = len(labels), start = 2.8, rot = -.1, dark = .25, light = .75, reverse = True)
-
-#count = 0
-
-for i in range(len(x)):
-    plt.plot(x[i][0], x[i][1], markersize = 10)
-plt.scatter(centroids[:, 0], centroids[:, 1], marker = "x", color = "red", s = 150, linewidths = 5)
-plt.show()
-    #count += 1
-
-
-# ### Map natural log values to their respective time points
+# # DIAGNOSTIC TOOLS
 # 
+
+# In[ ]:
+
+
+# View a specified frame:
+def frame_check(video, frame_number):
+    display = VideoFileClip(video)
+    return display.ipython_display(t=frame_number/30)
+    
+frame_check("motion_test.mov", 190)
+
 
 # In[ ]:
 
@@ -742,66 +789,50 @@ for log in max_vector_logs:
     count += 1
 
 
-# ## Back Converting Natural Logs to their Antilogs:
+# ### Back Converting Natural Logs to their Antilogs (DIAGNOSTIC PURPOSES ONLY)
 
 # In[ ]:
 
 
-### THERE IS NO NEED TO RUN THIS CODE. THIS IS JUST VERIFICATION THAT OUR NLOG CONVERSIONS ARE REVERSIBLE. ###
+### VERIFICATION THAT OUR NLOG CONVERSIONS ARE REVERSIBLE ###
 
-# # Map data BACK to video by un-logging.
-# # Need to ensure that the un-logging goes back far enough to get timestamped data, so that
-# # the data can be mapped to the video to see whether the mean of each distribution is a viable
-# # binary threshold for categorizing the animal as moving/not moving
+# Map data BACK to video by un-logging.
+# Need to ensure that the un-logging goes back far enough to get timestamped data, so that
+# the data can be mapped to the video to see whether the mean of each distribution is a viable
+# binary threshold for categorizing the animal as moving/not moving
 
-# logs_to_back_convert = max_vector_logs
+logs_to_back_convert = max_vector_logs
 
-# # 		If you were given ln(x) = 1.3 then x = inverse natural log of 1.3 or the natural
-# # 		antilog of 1.3 or 
-# # 		x = e1.3=3.669
+# 		If you were given ln(x) = 1.3 then x = inverse natural log of 1.3 or the natural
+# 		antilog of 1.3 or 
+# 		x = e1.3=3.669
 
-# # The exponential function is e^x where e is a mathematical constant 
-# # called Euler's number, approximately 2.718281.
+# The exponential function is e^x where e is a mathematical constant 
+# called Euler's number, approximately 2.718281.
 
-# print min(max_vector)
-# print max(max_vector)
-# print max_vector[1]
-# test_log = np.log(max_vector[1] + 1 - min(max_vector))
-# print test_log
-# antilog = np.exp(test_log) - (1 - min(max_vector))
-# print antilog
+print min(max_vector)
+print max(max_vector)
+print max_vector[1]
+test_log = np.log(max_vector[1] + 1 - min(max_vector))
+print test_log
+antilog = np.exp(test_log) - (1 - min(max_vector))
+print antilog
 
-# unlogged_list = []
+unlogged_list = []
 
-# def unlogged(natural_logs):
-#     for log in natural_logs:
-#         unlogged_list.append(np.exp(log) - (1 - min(max_vector)))
-#     return(0)
+def unlogged(natural_logs):
+    for log in natural_logs:
+        unlogged_list.append(np.exp(log) - (1 - min(max_vector)))
+    return(0)
 
-# unlogged(logs_to_back_convert)
+unlogged(logs_to_back_convert)
 
-# # So, back-conversion works fine, and we can preserve order,
-# # but I need to think a bit more about what this has bought us.
-
-
-# In[ ]:
-
-
-# freezing_logs = []
-
-# for freezing in freezing_list:
-#     freezing_log = np.log(freezing + 1 - min(freezing))
-#     freezing_logs.append(freezing_log)
-    
-# len(freezing_logs)
-# print len(freezing_logs[1])
-
-# print freezing_logs[1]
-# print max_vector_logs[1]
+# So, back-conversion works fine, and we can preserve order,
+# but I need to think a bit more about what this has bought us.
 
 
 # ## Video exporting begins here.
-# ## Currently a lower priority. 
+# ## Currently a lower priority--WE DO NOT NEED TO WORK ON THIS FOR PSC 290
 # ## Eventually, need to work out a way to do this task iteratively.
 
 # In[ ]:
@@ -852,15 +883,3 @@ clip2.mask.get_frame = lambda t: circle(screensize=(clip.w,clip.h),
 final = CompositeVideoClip([clip, clip2], size = clip.size)
 
 final.write_videofile("motion_test_outcomeII.mp4")
-
-
-# In[ ]:
-
-
-a = 5
-b = 10
-print "1: ", "a + b" # Python treats this as a literal string of characters, not as variables or math.
-print "2: ", a + b # Python treats this as a math operation performed on two variables, which store integers.
-print "3: ", a, "a + b" # Here, we're concatenating a variable (which stores an integer) and a character string.
-print "4: ", str(a + b) # Here, we're doing a math operation on two variables, then storing the output as a string.
-
